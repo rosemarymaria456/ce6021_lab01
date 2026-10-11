@@ -22,16 +22,27 @@ class GaussianFilt:
         self.sigma = sigma
 
     def gauss_kernel(self):
-        """Generate a normalised 1D Gaussian kernel of appropriate size for self.sigma.
+        """Generate a 1D Gaussian kernel as a column vector.
 
         Returns:
             gauss_1d (ndarray): Shape (k_size, 1) — column vector kernel.
         """
-        # Work out the necessary kernel size and range to generate the Gaussian over.
-        raise NotImplementedError("Implement this method")
+        sigma = float(self.sigma)
+        if sigma <= 0:
+            raise ValueError("sigma must be positive")
+
+        k_size = int(6 * sigma + 1)
+        if k_size % 2 == 0:
+            k_size += 1
+
+        half = k_size // 2
+        x = np.arange(-half, half + 1, dtype=np.float64)
+        g = np.exp(-(x ** 2) / (2 * sigma ** 2))
+        g = g / g.sum()
+        return g[:, np.newaxis]
 
     def my_conv_method(self, image):
-        """Perform separable 2D Gaussian convolution via two 1D matrix-multiply passes.
+        """Perform separable 2D Gaussian convolution via two 1D passes.
 
         Args:
             image (ndarray): 2D greyscale image (H, W), any numeric dtype.
@@ -39,4 +50,19 @@ class GaussianFilt:
         Returns:
             conv_img (ndarray): Blurred image of same shape, dtype uint8.
         """
-        raise NotImplementedError("Implement this method")
+        from scipy.ndimage import convolve1d
+
+        kernel = self.gauss_kernel()
+        kernel_1d = kernel.ravel()
+        k_size = len(kernel_1d)
+        pad = k_size // 2
+
+        img = image.astype(np.float64)
+        img_padded = np.pad(img, pad, mode='reflect')
+
+        
+        step1 = convolve1d(img_padded, kernel_1d, axis=1, mode='constant',cval=0.0)
+        step2 = convolve1d(step1, kernel_1d, axis=0, mode='constant',cval=0.0)
+
+        return np.clip(np.round(step2[pad:-pad, pad:-pad]), 0, 255).astype(np.uint8)
+
